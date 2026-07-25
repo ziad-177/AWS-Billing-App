@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: CronJob
+
+metadata:
+  name: aws-billing-to-teams
+  namespace: default
+
+spec:
+  schedule: "0 8 * * *"
+  timeZone: "Asia/Riyadh"
+
+  concurrencyPolicy: Replace
+
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: aws-billing-to-teams
+
+        spec:
+          containers:
+            - name: aws-billing-to-teams
+
+              image: aws-billing-to-teams:latest
+              imagePullPolicy: Always
+
+              envFrom:
+                - configMapRef:
+                    name: aws-billing-config
+
+                - secretRef:
+                    name: aws-billing-secrets
+
+              resources:
+                requests:
+                  cpu: "10m"
+                  memory: "32Mi"
+                limits:
+                  cpu: "50m"
+                  memory: "96Mi"
+
+          restartPolicy: Never

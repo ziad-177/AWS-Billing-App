@@ -1,0 +1,73 @@
+variables:
+  TAG: "${CI_COMMIT_SHORT_SHA}"
+  IMG_DEV_AWS: "${AWS_DEV_ECR_URL}/aws-billing/teams-notifier"
+
+
+build_report_app:
+  stage: app
+  cache: []
+  script: |
+    export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID_DEV}
+    export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY_DEV}
+    export AWS_REGION=${AWS_REGION}
+
+    aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin 098567765835.dkr.ecr.eu-central-1.amazonaws.com
+
+    echo "⚙️ Building Docker image..."
+    
+    docker build -t "${IMG_DEV_AWS}":"${TAG}" -f scripts/aws-billing/docker/Dockerfile .
+    echo "✅ Docker image built successfully!"
+    docker push "${IMG_DEV_AWS}":"${TAG}"
+
+  when: on_success
+  allow_failure: true
+  tags:
+    - pt-aws-frankfurt-2
+  only:
+    refs:
+      - main
+
+
+deploy_report_app:
+  stage: app
+  cache: []
+  script: |
+    export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID_DEV}
+    export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY_DEV}
+    export AWS_REGION=${AWS_REGION}
+
+    ${AWS_DEV_EKS_UPDATE_KUBECONFIG}
+    echo "⚙️ Creating/Updating Kubernetes secret..."
+    kubectl create secret generic aws-billing-secrets \
+      --namespace=default \
+      --from-literal=AWS_ACCOUNT_1_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID_DEV} \
+      --from-literal=AWS_ACCOUNT_1_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY_DEV} \
+      --from-literal=AWS_ACCOUNT_1_REGION=${AWS_REGION} \
+      --from-literal=TEAMS_WEBHOOK_URL="${TEAMS_WEBHOOK_URL}" \
+      --dry-run=client -o yaml | kubectl apply -f -
+      
+    echo "✅ Secret 'aws-billing-secrets' applied successfully!"
+
+
+    echo "⚙️ Creating/Updating Kubernetes ConfigMap..."
+
+    kubectl apply -f scripts/aws-billing/config.yaml
+
+    echo "✅ ConfigMap 'aws-billing-config' applied successfully!"
+
+
+    echo "⚙️ Deploying Kubernetes CronJob..."
+
+    sed -i "s|image: aws-billing-to-teams:.*|image: ${IMG_DEV_AWS}:${TAG}|g" scripts/aws-billing/cronjob.yaml && kubectl apply -f scripts/aws-billing/cronjob.yaml
+
+    echo "✅ CronJob deployed successfully!"
+
+  when: on_success
+  allow_failure: true
+  tags:
+    - pt-aws-frankfurt-2
+  needs:
+    - build_report_app
+  only:
+    refs:
+      - main

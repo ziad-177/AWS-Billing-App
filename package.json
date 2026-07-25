@@ -1,0 +1,8 @@
+{
+  "name": "aws-billing-to-slack",
+  "description": "",
+  "version": "0.1.0",
+  "devDependencies": {
+    "serverless-python-requirements": "^6.0.0"
+  }
+}

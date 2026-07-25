@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-billing-config
+
+data:
+  DEFAULT_GROUP_BY: "SERVICE"
+  GROUP_BY: "SERVICE"
+  LENGTH: "10"
+  REPORT_DAYS: "1"
+  AWS_ACCOUNT_COUNT: "1"
+  AWS_ACCOUNT_1_NAME: " AWS DEV ACCOUNT "
